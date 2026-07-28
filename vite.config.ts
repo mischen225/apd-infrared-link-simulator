@@ -1,20 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { cloudflare } from '@cloudflare/vite-plugin';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), cloudflare()],
   base: './',
   build: {
     target: 'es2020',
     sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          react: ['react', 'react-dom'],
-          echarts: ['echarts', 'echarts-for-react'],
-          icons: ['lucide-react'],
-        },
-      },
-    },
   },
 });

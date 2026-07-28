@@ -43,6 +43,7 @@ pnpm build
 
 - 所有光学、APD、噪声、扫描、矩阵和蒙特卡洛计算都在浏览器中完成。
 - 应用不调用后端、数据库或远程 API。
+- `worker/index.ts` 只是部署平台所需的静态资源入口，不承担任何仿真计算或数据存储。
 - 字体使用系统字体；生产包不依赖远程字体或图片。
 - 完成一次依赖安装和 `npm run build` 后，`dist/` 是完整静态生产包，可由任意静态文件服务器提供。
 - 模型配置和用户保存的场景只保存在 JSON 文件或浏览器 `localStorage`。
@@ -480,12 +481,18 @@ SNR_dB = 20 log10(SNR_mod)
 │  ├─ App.tsx
 │  ├─ main.tsx
 │  └─ styles.css
+├─ scripts/
+│  ├─ clean-dist.mjs
+│  └─ prepare-sites.mjs
+├─ worker/
+│  └─ index.ts
 ├─ index.html
 ├─ package.json
 ├─ pnpm-workspace.yaml
 ├─ tsconfig.json
 ├─ vite.config.ts
-└─ vitest.config.ts
+├─ vitest.config.ts
+└─ wrangler.jsonc
 ```
 
 ## 导入 JSON 校验
