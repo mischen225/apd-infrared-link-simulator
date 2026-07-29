@@ -68,6 +68,8 @@ export const DEFAULT_PARAMETERS: SimulationParameters = {
     breakdownVoltageV: 200,
     biasVoltageV: 180,
     maxOutputCurrentA: 2e-3,
+    loadResistanceOhm: 10e6,
+    includeLoadThermalNoise: false,
   },
   background: {
     mode: 'direct',

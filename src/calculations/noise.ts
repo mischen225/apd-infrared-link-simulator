@@ -17,7 +17,61 @@ export function surfaceShotNoiseRms(surfaceCurrentA: number, bandwidthHz: number
 }
 
 export function resistorThermalNoiseRms(resistanceOhm: number, temperatureK: number, bandwidthHz: number): number {
-  return Math.sqrt((4 * BOLTZMANN_JK * temperatureK * bandwidthHz) / resistanceOhm);
+  return Math.sqrt(resistorThermalNoiseCurrentMeanSquare(resistanceOhm, temperatureK, bandwidthHz));
+}
+
+export function resistorThermalNoiseCurrentMeanSquare(
+  resistanceOhm: number,
+  temperatureK: number,
+  bandwidthHz: number,
+): number {
+  return (4 * BOLTZMANN_JK * temperatureK * bandwidthHz) / resistanceOhm;
+}
+
+export function resistorThermalNoiseCurrentDensity(
+  resistanceOhm: number,
+  temperatureK: number,
+): number {
+  return Math.sqrt((4 * BOLTZMANN_JK * temperatureK) / resistanceOhm);
+}
+
+export function resistorThermalNoiseVoltageDensity(
+  resistanceOhm: number,
+  temperatureK: number,
+): number {
+  return Math.sqrt(4 * BOLTZMANN_JK * temperatureK * resistanceOhm);
+}
+
+export function resistorThermalNoiseVoltageRms(
+  resistanceOhm: number,
+  temperatureK: number,
+  bandwidthHz: number,
+): number {
+  return Math.sqrt(4 * BOLTZMANN_JK * temperatureK * resistanceOhm * bandwidthHz);
+}
+
+export function apdShotAndThermalNoiseRms(
+  primaryPhotocurrentA: number,
+  primaryDarkCurrentA: number,
+  gain: number,
+  excessFactor: number,
+  bandwidthHz: number,
+  loadResistanceOhm: number,
+  temperatureK: number,
+): number {
+  const shotVariance =
+    2 *
+    ELECTRON_CHARGE_C *
+    gain ** 2 *
+    excessFactor *
+    (primaryPhotocurrentA + primaryDarkCurrentA) *
+    bandwidthHz;
+  const thermalVariance = resistorThermalNoiseCurrentMeanSquare(
+    loadResistanceOhm,
+    temperatureK,
+    bandwidthHz,
+  );
+  return Math.sqrt(shotVariance + thermalVariance);
 }
 
 export function integratedVoltageNoiseRms(apd: APDParameters, tia: TIAParameters): number {
@@ -66,6 +120,11 @@ export function noiseBreakdown(input: NoiseInputs): NoiseBreakdown {
   const backgroundShotA = shotNoiseRms(input.backgroundPrimaryA, apd.gain, input.excessFactor, b);
   const bulkDarkShotA = shotNoiseRms(input.bulkDarkPrimaryA, apd.gain, input.excessFactor, b);
   const surfaceDarkShotA = surfaceShotNoiseRms(input.surfaceDarkOutputA, b);
+  const apdLoadThermalA = resistorThermalNoiseRms(
+    apd.loadResistanceOhm,
+    apd.temperatureK,
+    b,
+  );
   const feedbackThermalA = resistorThermalNoiseRms(tia.feedbackResistanceOhm, apd.temperatureK, b);
   const opAmpCurrentA = tia.opAmpCurrentNoiseAHz * Math.sqrt(b);
   const opAmpVoltageA = integratedVoltageNoiseRms(apd, tia);
@@ -78,6 +137,7 @@ export function noiseBreakdown(input: NoiseInputs): NoiseBreakdown {
     backgroundShotA,
     bulkDarkShotA,
     surfaceDarkShotA,
+    apd.includeLoadThermalNoise ? apdLoadThermalA : 0,
     feedbackThermalA,
     opAmpCurrentA,
     opAmpVoltageA,
@@ -90,6 +150,7 @@ export function noiseBreakdown(input: NoiseInputs): NoiseBreakdown {
     backgroundShotA,
     bulkDarkShotA,
     surfaceDarkShotA,
+    apdLoadThermalA,
     feedbackThermalA,
     opAmpCurrentA,
     opAmpVoltageA,

@@ -1,9 +1,29 @@
 import type { SimulationParameters } from '../models/types';
+import { cloneDefaults } from '../data/defaults';
 
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
   value?: SimulationParameters;
+}
+
+function normalizeConfiguration(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+  const defaults = cloneDefaults();
+  const candidate = value as Partial<SimulationParameters>;
+  return {
+    ...defaults,
+    ...candidate,
+    source: { ...defaults.source, ...candidate.source },
+    propagation: { ...defaults.propagation, ...candidate.propagation },
+    optics: { ...defaults.optics, ...candidate.optics },
+    apd: { ...defaults.apd, ...candidate.apd },
+    background: { ...defaults.background, ...candidate.background },
+    tia: { ...defaults.tia, ...candidate.tia },
+    customParameters: Array.isArray(candidate.customParameters)
+      ? candidate.customParameters
+      : defaults.customParameters,
+  };
 }
 
 export function validateParameters(value: unknown): ValidationResult {
@@ -19,6 +39,7 @@ export function validateParameters(value: unknown): ValidationResult {
   positive(p.optics?.apertureDiameterM, '透镜口径');
   positive(p.tia?.enbwHz, '等效噪声带宽');
   positive(p.apd?.gain, 'APD 增益');
+  positive(p.apd?.loadResistanceOhm, 'APD 负载电阻');
   if (
     typeof p.propagation?.atmosphericTransmission !== 'number' ||
     p.propagation.atmosphericTransmission < 0 ||
@@ -31,7 +52,7 @@ export function validateParameters(value: unknown): ValidationResult {
 
 export function safeParseConfiguration(text: string): ValidationResult {
   try {
-    return validateParameters(JSON.parse(text));
+    return validateParameters(normalizeConfiguration(JSON.parse(text)));
   } catch {
     return { valid: false, errors: ['JSON 格式错误，请检查逗号、引号和括号'] };
   }

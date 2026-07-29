@@ -101,14 +101,23 @@ export default function App() {
   };
 
   const copySummary = async () => {
-    const text = [
-      'APD红外光链路综合仿真结果',
-      `P_lens = Ie·Aeff/R² = ${result.lensPowerW.toExponential(6)} W`,
-      `P_sig = P_lens·∏η = ${result.signalPowerW.toExponential(6)} W`,
-      `I_p = Rλ·P_sig = ${result.primaryCurrentA.toExponential(6)} A`,
-      `I_sig = M·I_p = ${result.signalCurrentA.toExponential(6)} A`,
-      `i_total = √Σi² = ${result.noises.totalA.toExponential(6)} A RMS`,
-      `SNR_mod = m·I_sig/i_total = ${result.modulatedSnr.toFixed(6)}`,
+      const text = [
+        'APD红外光链路综合仿真结果',
+        `P_fs = Ie·Aeff/R² = ${result.freeSpaceCapturePowerW.toExponential(6)} W`,
+        `P_lens = P_fs·η_propagation = ${result.lensPowerW.toExponential(6)} W`,
+        `P_sig = P_lens·η_receiver = ${result.signalPowerW.toExponential(6)} W`,
+        `η_propagation = ${result.propagationEfficiency.toExponential(6)}`,
+        `η_receiver = ${result.receiverOpticalEfficiency.toExponential(6)}`,
+        `功率账本闭合误差 = ${result.reconciliationErrorFraction.toExponential(6)}`,
+        `I_p = Rλ·P_sig = ${result.primaryCurrentA.toExponential(6)} A`,
+        `I_sig = M·I_p = ${result.signalCurrentA.toExponential(6)} A`,
+        `i_th,rms = ${result.apdThermalNoise.currentRmsA.toExponential(6)} A`,
+        `i_th,density = ${result.apdThermalNoise.currentDensityAHz.toExponential(6)} A/√Hz`,
+        `v_th,rms = ${result.apdThermalNoise.voltageRmsV.toExponential(6)} V`,
+        `v_th,density = ${result.apdThermalNoise.voltageDensityVHz.toExponential(6)} V/√Hz`,
+        `i_APD,shot+thermal = ${result.apdThermalNoise.shotAndThermalRmsA.toExponential(6)} A`,
+        `i_total = √Σi² = ${result.noises.totalA.toExponential(6)} A RMS`,
+        `SNR_mod = m·I_sig/i_total = ${result.modulatedSnr.toFixed(6)}`,
       `SNR_dB = 20log10(SNR_mod) = ${result.snrDb.toFixed(3)} dB`,
       `结论：${result.detectionLabel}`,
     ].join('\n');

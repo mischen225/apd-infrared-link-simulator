@@ -228,6 +228,7 @@ function NoiseView({ result, parameters }: { result: SimulationResult; parameter
     ['背景散粒', result.noises.backgroundShotA],
     ['体暗电流', result.noises.bulkDarkShotA],
     ['表面暗电流', result.noises.surfaceDarkShotA],
+    [parameters.apd.includeLoadThermalNoise ? 'APD负载热噪声（计入）' : 'APD负载热噪声（仅显示）', result.noises.apdLoadThermalA],
     ['反馈热噪声', result.noises.feedbackThermalA],
     ['运放电流', result.noises.opAmpCurrentA],
     ['运放电压', result.noises.opAmpVoltageA],
@@ -242,7 +243,7 @@ function NoiseView({ result, parameters }: { result: SimulationResult; parameter
     yAxis: { type: 'log', name: 'RMS 噪声 / A', nameTextStyle: axisText, axisLabel: { ...axisText, formatter: (v: number) => v.toExponential(0) }, splitLine: gridLine },
     series: [{
       type: 'bar',
-      data: components.map((c, i) => ({ value: c[1], itemStyle: { color: ['#e99955', '#df6c5b', '#9b7ec8', '#756aa9', '#5dacc2', '#65c8a0', '#d6bc62', '#7795a2'][i] } })),
+      data: components.map((c, i) => ({ value: c[1], itemStyle: { color: ['#e99955', '#df6c5b', '#9b7ec8', '#756aa9', '#c58a55', '#5dacc2', '#65c8a0', '#d6bc62', '#7795a2'][i] } })),
       barMaxWidth: 38,
     }],
   };
@@ -402,7 +403,7 @@ function BatchView({ parameters }: { parameters: SimulationParameters }) {
     const data = rows.map((row) => ({
       距离_km: row.distanceM / 1000,
       辐射强度_W每sr: row.radiantIntensityWsr,
-      镜头入口功率_W: row.typical.lensPowerW,
+          镜头入口功率_传播后_W: row.typical.lensPowerW,
       APD接收功率_W: row.typical.signalPowerW,
       初级光电流_A: row.typical.primaryCurrentA,
       APD倍增电流_A: row.typical.signalCurrentA,
@@ -428,7 +429,7 @@ function BatchView({ parameters }: { parameters: SimulationParameters }) {
       </div>
       <div className="data-table-wrap">
         <table className="data-table">
-          <thead><tr><th>距离</th><th>光强</th><th>镜头入口</th><th>APD 接收</th><th>初级电流</th><th>倍增电流</th><th>TIA 输出</th><th>总噪声</th><th>典型 SNR</th><th>最大暗流 SNR</th><th>SNR dB</th><th>结论</th></tr></thead>
+            <thead><tr><th>距离</th><th>光强</th><th>镜头入口（传播后）</th><th>APD 接收</th><th>初级电流</th><th>倍增电流</th><th>TIA 输出</th><th>总噪声</th><th>典型 SNR</th><th>最大暗流 SNR</th><th>SNR dB</th><th>结论</th></tr></thead>
           <tbody>
             {filtered.map((row) => (
               <tr key={`${row.distanceM}-${row.radiantIntensityWsr}`}>

@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { cloneDefaults } from '../data/defaults';
 import { excessNoiseFactor, multipliedCurrent, primaryPhotocurrent } from '../calculations/apd';
-import { effectiveArea, lensEntrancePower } from '../calculations/opticalLink';
-import { shotNoiseRms } from '../calculations/noise';
+import { effectiveArea, freeSpaceCapturePower } from '../calculations/opticalLink';
+import {
+  apdShotAndThermalNoiseRms,
+  BOLTZMANN_JK,
+  ELECTRON_CHARGE_C,
+  resistorThermalNoiseCurrentDensity,
+  resistorThermalNoiseCurrentMeanSquare,
+  resistorThermalNoiseRms,
+  resistorThermalNoiseVoltageDensity,
+  resistorThermalNoiseVoltageRms,
+  shotNoiseRms,
+} from '../calculations/noise';
 import { simulate } from '../calculations/simulate';
 import { defaultBatch, simulateMultiLinks } from '../calculations/sweep';
 import { formatEngineering } from '../utils/format';
@@ -12,25 +22,56 @@ describe('光学链路纯函数', () => {
   it('光功率按距离平方反比变化', () => {
     const p = cloneDefaults();
     const area = effectiveArea(p.optics.apertureDiameterM, 0);
-    const p1 = lensEntrancePower(p.source, area, 1000);
-    const p2 = lensEntrancePower(p.source, area, 2000);
+    const p1 = freeSpaceCapturePower(p.source, area, 1000);
+    const p2 = freeSpaceCapturePower(p.source, area, 2000);
     expect(p1 / p2).toBeCloseTo(4, 10);
   });
 
   it('光功率与辐射强度成正比', () => {
     const p = cloneDefaults();
     const area = effectiveArea(p.optics.apertureDiameterM, 0);
-    const p1 = lensEntrancePower(p.source, area, 1000);
+    const p1 = freeSpaceCapturePower(p.source, area, 1000);
     p.source.radiantIntensityWsr *= 3;
-    const p2 = lensEntrancePower(p.source, area, 1000);
+    const p2 = freeSpaceCapturePower(p.source, area, 1000);
     expect(p2 / p1).toBeCloseTo(3, 10);
   });
 
   it('光功率与透镜面积成正比', () => {
     const p = cloneDefaults();
-    const p1 = lensEntrancePower(p.source, 1e-4, 1000);
-    const p2 = lensEntrancePower(p.source, 2e-4, 1000);
+    const p1 = freeSpaceCapturePower(p.source, 1e-4, 1000);
+    const p2 = freeSpaceCapturePower(p.source, 2e-4, 1000);
     expect(p2 / p1).toBeCloseTo(2, 10);
+  });
+
+  it('镜头入口功率包含大气与全部传播损耗', () => {
+    const p = cloneDefaults();
+    p.propagation.atmosphericTransmission = 0.8;
+    p.propagation.pointingEfficiency = 0.9;
+    p.propagation.jitterEfficiency = 0.95;
+    p.propagation.turbulenceEfficiency = 0.85;
+    p.propagation.otherLossDb = 1.2;
+    const result = simulate(p);
+    const expected =
+      0.8 * 0.9 * 0.95 * 0.85 * 10 ** (-1.2 / 10);
+    expect(result.lensPowerW / result.freeSpaceCapturePowerW).toBeCloseTo(expected, 14);
+  });
+
+  it('全部传播与接收效率为1时没有未知损耗', () => {
+    const p = cloneDefaults();
+    p.propagation.atmosphericTransmission = 1;
+    p.propagation.pointingEfficiency = 1;
+    p.propagation.jitterEfficiency = 1;
+    p.propagation.turbulenceEfficiency = 1;
+    p.propagation.otherLossDb = 0;
+    p.optics.lensTransmission = 1;
+    p.optics.filterTransmission = 1;
+    p.optics.spectralEfficiency = 1;
+    p.optics.couplingEfficiency = 1;
+    p.optics.alignmentEfficiency = 1;
+    const result = simulate(p);
+    expect(result.lensPowerW).toBeCloseTo(result.freeSpaceCapturePowerW, 20);
+    expect(result.signalPowerW).toBeCloseTo(result.freeSpaceCapturePowerW, 20);
+    expect(result.reconciliationErrorFraction).toBe(0);
   });
 });
 
@@ -71,6 +112,44 @@ describe('APD与噪声', () => {
     const expected = shotNoiseRms(result.primaryCurrentA, p.apd.gain, result.excessNoiseFactor, 300);
     expect(result.noises.signalShotA).toBeCloseTo(expected, 16);
   });
+
+  it('电阻热噪声电流与电压公式逐项正确', () => {
+    const resistance = 10e6;
+    const temperature = 293.15;
+    const bandwidth = 300;
+    const currentMeanSquare = (4 * BOLTZMANN_JK * temperature * bandwidth) / resistance;
+    expect(resistorThermalNoiseCurrentMeanSquare(resistance, temperature, bandwidth)).toBeCloseTo(currentMeanSquare, 30);
+    expect(resistorThermalNoiseRms(resistance, temperature, bandwidth) ** 2).toBeCloseTo(currentMeanSquare, 30);
+    expect(resistorThermalNoiseCurrentDensity(resistance, temperature) ** 2).toBeCloseTo((4 * BOLTZMANN_JK * temperature) / resistance, 30);
+    expect(resistorThermalNoiseVoltageRms(resistance, temperature, bandwidth) ** 2).toBeCloseTo(4 * BOLTZMANN_JK * temperature * resistance * bandwidth, 20);
+    expect(resistorThermalNoiseVoltageDensity(resistance, temperature) ** 2).toBeCloseTo(4 * BOLTZMANN_JK * temperature * resistance, 20);
+  });
+
+  it('APD散粒与热噪声按用户给定公式合成', () => {
+    const ip = 8e-12;
+    const id = 0.16e-9;
+    const gain = 100;
+    const factor = 4;
+    const bandwidth = 300;
+    const resistance = 10e6;
+    const temperature = 293.15;
+    const expected = Math.sqrt(
+      2 * ELECTRON_CHARGE_C * gain ** 2 * factor * (ip + id) * bandwidth +
+      (4 * BOLTZMANN_JK * temperature * bandwidth) / resistance,
+    );
+    expect(apdShotAndThermalNoiseRms(ip, id, gain, factor, bandwidth, resistance, temperature)).toBeCloseTo(expected, 20);
+  });
+
+  it('APD负载热噪声仅在开关开启时计入系统总噪声', () => {
+    const p = cloneDefaults();
+    p.apd.includeLoadThermalNoise = false;
+    const excluded = simulate(p);
+    p.apd.includeLoadThermalNoise = true;
+    const included = simulate(p);
+    expect(included.noises.totalA).toBeGreaterThan(excluded.noises.totalA);
+    expect(included.apdThermalNoise.includedInSystemTotal).toBe(true);
+    expect(excluded.noises.apdLoadThermalA).toBeCloseTo(included.noises.apdLoadThermalA, 20);
+  });
 });
 
 describe('系统行为', () => {
@@ -101,6 +180,17 @@ describe('系统行为', () => {
     const p = cloneDefaults();
     p.propagation.distanceM = -1;
     expect(safeParseConfiguration(JSON.stringify(p)).valid).toBe(false);
+  });
+
+  it('旧版JSON缺少新增热噪声字段时自动补默认值', () => {
+    const p = cloneDefaults();
+    const legacy = JSON.parse(JSON.stringify(p));
+    delete legacy.apd.loadResistanceOhm;
+    delete legacy.apd.includeLoadThermalNoise;
+    const parsed = safeParseConfiguration(JSON.stringify(legacy));
+    expect(parsed.valid).toBe(true);
+    expect(parsed.value?.apd.loadResistanceOhm).toBe(10e6);
+    expect(parsed.value?.apd.includeLoadThermalNoise).toBe(false);
   });
 
   it('3、4、5 km与1、2、5 W/sr生成完整9组结果', () => {

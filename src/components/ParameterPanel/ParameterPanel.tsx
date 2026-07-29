@@ -98,6 +98,7 @@ export function ParameterPanel({ parameters, onChange }: ParameterPanelProps) {
         )}
         <NumberField label="指向效率" value={parameters.propagation.pointingEfficiency * 100} unit="%" min={0} max={100} onChange={(v) => update('propagation', 'pointingEfficiency', v / 100)} />
         <NumberField label="平台抖动效率" value={parameters.propagation.jitterEfficiency * 100} unit="%" min={0} max={100} onChange={(v) => update('propagation', 'jitterEfficiency', v / 100)} />
+        <NumberField label="湍流效率" value={parameters.propagation.turbulenceEfficiency * 100} unit="%" min={0} max={100} onChange={(v) => update('propagation', 'turbulenceEfficiency', v / 100)} />
         <NumberField label="其他损耗" value={parameters.propagation.otherLossDb} unit="dB" min={0} onChange={(v) => update('propagation', 'otherLossDb', v)} />
       </Section>
 
@@ -108,6 +109,7 @@ export function ParameterPanel({ parameters, onChange }: ParameterPanelProps) {
         <NumberField label="滤光片透过率" value={parameters.optics.filterTransmission * 100} unit="%" min={0} max={100} onChange={(v) => update('optics', 'filterTransmission', v / 100)} />
         <NumberField label="光谱匹配" value={parameters.optics.spectralEfficiency * 100} unit="%" min={0} max={100} onChange={(v) => update('optics', 'spectralEfficiency', v / 100)} />
         <NumberField label="耦合效率" value={parameters.optics.couplingEfficiency * 100} unit="%" min={0} max={100} onChange={(v) => update('optics', 'couplingEfficiency', v / 100)} />
+        <NumberField label="对准效率" value={parameters.optics.alignmentEfficiency * 100} unit="%" min={0} max={100} onChange={(v) => update('optics', 'alignmentEfficiency', v / 100)} />
         <NumberField label="滤光片带宽" value={parameters.optics.filterFwhmM * 1e9} unit="nm" min={0.01} onChange={(v) => update('optics', 'filterFwhmM', v * 1e-9)} />
         <label className="switch-row">
           <span>精细光谱积分</span>
@@ -150,6 +152,16 @@ export function ParameterPanel({ parameters, onChange }: ParameterPanelProps) {
         <NumberField label="体暗电流" value={parameters.apd.bulkDarkCurrentA * 1e9} unit="nA" min={0} onChange={(v) => update('apd', 'bulkDarkCurrentA', v * 1e-9)} />
         <NumberField label="表面暗电流" value={parameters.apd.surfaceDarkCurrentA * 1e9} unit="nA" min={0} onChange={(v) => update('apd', 'surfaceDarkCurrentA', v * 1e-9)} />
         <NumberField label="结电容" value={parameters.apd.junctionCapacitanceF * 1e12} unit="pF" min={0} onChange={(v) => update('apd', 'junctionCapacitanceF', v * 1e-12)} />
+        <NumberField label="APD 负载电阻" value={parameters.apd.loadResistanceOhm / 1e6} unit="MΩ" min={0.000001} onChange={(v) => update('apd', 'loadResistanceOhm', v * 1e6)} />
+        <label className="switch-row">
+          <span>计入负载热噪声</span>
+          <input
+            type="checkbox"
+            checked={parameters.apd.includeLoadThermalNoise}
+            onChange={(e) => update('apd', 'includeLoadThermalNoise', e.target.checked)}
+          />
+        </label>
+        <p className="parameter-note">独立电阻负载时开启；TIA 结构通常关闭，以免与反馈电阻 Rf 的热噪声重复计算。</p>
       </Section>
 
       <Section icon={<ScanLine size={15} />} title="背景光与带宽" badge="噪声源">

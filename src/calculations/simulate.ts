@@ -6,10 +6,20 @@ import {
   effectiveArea,
   effectiveDistance,
   fovSolidAngle,
-  lensEntrancePower,
+  freeSpaceCapturePower,
+  propagationEfficiency,
+  receiverOpticalEfficiency,
   totalOpticalEfficiency,
 } from './opticalLink';
-import { noiseBreakdown } from './noise';
+import {
+  apdShotAndThermalNoiseRms,
+  noiseBreakdown,
+  resistorThermalNoiseCurrentDensity,
+  resistorThermalNoiseCurrentMeanSquare,
+  resistorThermalNoiseRms,
+  resistorThermalNoiseVoltageDensity,
+  resistorThermalNoiseVoltageRms,
+} from './noise';
 import { spectralCurves } from './spectralIntegration';
 
 export function detectionLabel(snr: number): string {
@@ -26,12 +36,21 @@ export function simulate(parameters: SimulationParameters, darkOverrideA?: numbe
   const distanceM = effectiveDistance(propagation);
   const effectiveAreaM2 = effectiveArea(optics.apertureDiameterM, optics.obscurationRatio);
   const fovSolidAngleSr = fovSolidAngle(optics);
-  const lensPowerW = lensEntrancePower(source, effectiveAreaM2, distanceM);
+  const freeSpaceCapturePowerW = freeSpaceCapturePower(source, effectiveAreaM2, distanceM);
   const atmosphere = atmosphericTransmission(propagation, distanceM);
-  const afterAtmosphereW = lensPowerW * atmosphere;
-  const afterFilterW = afterAtmosphereW * optics.lensTransmission * optics.filterTransmission;
+  const afterAtmosphereW = freeSpaceCapturePowerW * atmosphere;
+  const propagationFactor = propagationEfficiency(propagation, atmosphere);
+  // 工程口径：镜头入口功率已经包含自由空间几何扩散以及全部传播/大气损耗。
+  const lensPowerW = freeSpaceCapturePowerW * propagationFactor;
+  const afterLensW = lensPowerW * optics.lensTransmission;
+  const afterFilterW = afterLensW * optics.filterTransmission;
+  const receiverFactor = receiverOpticalEfficiency(optics);
   const totalEfficiency = totalOpticalEfficiency(propagation, optics, atmosphere);
-  const signalPowerW = lensPowerW * totalEfficiency;
+  const signalPowerW = lensPowerW * receiverFactor;
+  const reconciledSignalPowerW = freeSpaceCapturePowerW * totalEfficiency;
+  const reconciliationErrorW = signalPowerW - reconciledSignalPowerW;
+  const reconciliationErrorFraction =
+    Math.abs(reconciliationErrorW) / Math.max(Math.abs(reconciledSignalPowerW), Number.EPSILON);
   const backgroundPowerW = backgroundPower(background, effectiveAreaM2, fovSolidAngleSr);
   const spectral = spectralCurves(
     source.wavelengthM,
@@ -57,6 +76,42 @@ export function simulate(parameters: SimulationParameters, darkOverrideA?: numbe
     apd,
     tia,
   });
+  const apdThermalCurrentMeanSquare = resistorThermalNoiseCurrentMeanSquare(
+    apd.loadResistanceOhm,
+    apd.temperatureK,
+    tia.enbwHz,
+  );
+  const apdThermalNoise = {
+    currentMeanSquareA2: apdThermalCurrentMeanSquare,
+    currentDensityAHz: resistorThermalNoiseCurrentDensity(
+      apd.loadResistanceOhm,
+      apd.temperatureK,
+    ),
+    currentRmsA: resistorThermalNoiseRms(
+      apd.loadResistanceOhm,
+      apd.temperatureK,
+      tia.enbwHz,
+    ),
+    voltageDensityVHz: resistorThermalNoiseVoltageDensity(
+      apd.loadResistanceOhm,
+      apd.temperatureK,
+    ),
+    voltageRmsV: resistorThermalNoiseVoltageRms(
+      apd.loadResistanceOhm,
+      apd.temperatureK,
+      tia.enbwHz,
+    ),
+    shotAndThermalRmsA: apdShotAndThermalNoiseRms(
+      primaryCurrentA,
+      dark.bulkPreA,
+      apd.gain,
+      excess,
+      tia.enbwHz,
+      apd.loadResistanceOhm,
+      apd.temperatureK,
+    ),
+    includedInSystemTotal: apd.includeLoadThermalNoise,
+  };
   const snr = signalCurrentA / noises.totalA;
   const modulatedSnr = (source.modulationDepth * signalCurrentA) / noises.totalA;
   const snrDb = 20 * Math.log10(Math.max(modulatedSnr, Number.MIN_VALUE));
@@ -76,13 +131,31 @@ export function simulate(parameters: SimulationParameters, darkOverrideA?: numbe
     distanceM,
     effectiveAreaM2,
     fovSolidAngleSr,
+    freeSpaceCapturePowerW,
     lensPowerW,
     afterAtmosphereW,
+    afterLensW,
     afterFilterW,
     signalPowerW,
     backgroundPowerW,
     atmosphericTransmission: atmosphere,
+    propagationEfficiency: propagationFactor,
+    receiverOpticalEfficiency: receiverFactor,
     totalOpticalEfficiency: totalEfficiency,
+    efficiencyBudget: {
+      atmosphere,
+      pointing: propagation.pointingEfficiency,
+      jitter: propagation.jitterEfficiency,
+      turbulence: propagation.turbulenceEfficiency,
+      otherPropagation: 10 ** (-propagation.otherLossDb / 10),
+      lens: optics.lensTransmission,
+      filter: optics.filterTransmission,
+      spectral: optics.spectralEfficiency,
+      coupling: optics.couplingEfficiency,
+      alignment: optics.alignmentEfficiency,
+    },
+    reconciliationErrorW,
+    reconciliationErrorFraction,
     linkLossDb: -10 * Math.log10(Math.max(totalEfficiency, Number.MIN_VALUE)),
     responsivityAW,
     primaryCurrentA,
@@ -92,6 +165,7 @@ export function simulate(parameters: SimulationParameters, darkOverrideA?: numbe
     darkOutputCurrentA: dark.outputA,
     meanOutputCurrentA: signalCurrentA + backgroundCurrentA + dark.outputA,
     excessNoiseFactor: excess,
+    apdThermalNoise,
     noises,
     snr,
     modulatedSnr,

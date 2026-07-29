@@ -138,7 +138,7 @@ export function SceneView({ parameters, result, links, multiMode }: SceneViewPro
         {[
           ['发射强度', `${parameters.source.radiantIntensityWsr.toFixed(2)} W/sr`],
           ['大气透过', `${(result.atmosphericTransmission * 100).toFixed(1)}%`],
-          ['镜头入口', formatEngineering(result.lensPowerW, 'W')],
+          ['镜头入口（传播后）', formatEngineering(result.lensPowerW, 'W')],
           ['滤光片后', formatEngineering(result.afterFilterW, 'W')],
           ['检测状态', result.detectionLabel],
         ].map(([label, value], index) => (

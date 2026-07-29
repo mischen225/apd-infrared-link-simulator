@@ -81,6 +81,8 @@ export interface APDParameters {
   breakdownVoltageV: number;
   biasVoltageV: number;
   maxOutputCurrentA: number;
+  loadResistanceOhm: number;
+  includeLoadThermalNoise: boolean;
 }
 
 export interface BackgroundParameters {
@@ -137,6 +139,7 @@ export interface NoiseBreakdown {
   backgroundShotA: number;
   bulkDarkShotA: number;
   surfaceDarkShotA: number;
+  apdLoadThermalA: number;
   feedbackThermalA: number;
   opAmpCurrentA: number;
   opAmpVoltageA: number;
@@ -146,17 +149,47 @@ export interface NoiseBreakdown {
   totalA: number;
 }
 
+export interface LinkEfficiencyBudget {
+  atmosphere: number;
+  pointing: number;
+  jitter: number;
+  turbulence: number;
+  otherPropagation: number;
+  lens: number;
+  filter: number;
+  spectral: number;
+  coupling: number;
+  alignment: number;
+}
+
+export interface APDThermalNoiseResult {
+  currentMeanSquareA2: number;
+  currentDensityAHz: number;
+  currentRmsA: number;
+  voltageDensityVHz: number;
+  voltageRmsV: number;
+  shotAndThermalRmsA: number;
+  includedInSystemTotal: boolean;
+}
+
 export interface SimulationResult {
   distanceM: number;
   effectiveAreaM2: number;
   fovSolidAngleSr: number;
+  freeSpaceCapturePowerW: number;
   lensPowerW: number;
   afterAtmosphereW: number;
+  afterLensW: number;
   afterFilterW: number;
   signalPowerW: number;
   backgroundPowerW: number;
   atmosphericTransmission: number;
+  propagationEfficiency: number;
+  receiverOpticalEfficiency: number;
   totalOpticalEfficiency: number;
+  efficiencyBudget: LinkEfficiencyBudget;
+  reconciliationErrorW: number;
+  reconciliationErrorFraction: number;
   linkLossDb: number;
   responsivityAW: number;
   primaryCurrentA: number;
@@ -166,6 +199,7 @@ export interface SimulationResult {
   darkOutputCurrentA: number;
   meanOutputCurrentA: number;
   excessNoiseFactor: number;
+  apdThermalNoise: APDThermalNoiseResult;
   noises: NoiseBreakdown;
   snr: number;
   modulatedSnr: number;

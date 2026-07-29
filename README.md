@@ -154,12 +154,12 @@ A_eff = πD²(1 − ε) / 4
 Ω_FOV ≈ π(θ_FOV / 2)²
 ```
 
-### 5. 镜头入口光功率
+### 5. 自由空间几何接收功率
 
 指定方向辐射强度模型：
 
 ```text
-P_lens = I_e A_eff / R²
+P_fs = I_e A_eff / R²
 ```
 
 若使用总辐射功率，则先按光束立体角估算方向辐射强度：
@@ -169,17 +169,23 @@ P_lens = I_e A_eff / R²
 I_e ≈ P_total / Ω_beam
 ```
 
-### 6. 总光学效率与 APD 信号光功率
+### 6. 传播后的镜头入口光功率与 APD 信号光功率
 
 ```text
-η_total =
-  T_atm · T_lens · T_filter · η_spectral · η_coupling ·
-  η_alignment · η_pointing · η_jitter · η_turbulence · 10^(−L_other/10)
+η_propagation =
+  T_atm · η_pointing · η_jitter · η_turbulence · 10^(−L_other/10)
 
-P_sig = P_lens η_total
+P_lens = P_fs η_propagation
+
+η_receiver =
+  T_lens · T_filter · η_spectral · η_coupling · η_alignment
+
+P_sig = P_lens η_receiver
+
+η_total = η_propagation η_receiver
 ```
 
-界面中每项效率都可独立编辑。
+本项目把“镜头入口光功率”定义为已经经过大气和全部传播损耗后的功率。`P_fs` 单独显示，仅表示平方反比几何接收。界面中 10 项效率都可独立编辑并在损耗账本中逐项显示；同时显示分阶段计算与一次累乘结果的闭合误差。所有效率设为 `1`、其他损耗设为 `0 dB` 时，`P_sig = P_lens = P_fs`，不存在隐含损耗。
 
 ### 7. 背景光
 
@@ -284,7 +290,7 @@ i_surface,rms = √(2qB I_ds)
 i_shot² = 2qB [M²F(M)(I_p + I_bg,p + I_db) + I_ds]
 ```
 
-### 13. TIA 反馈电阻热噪声
+### 13. APD 负载电阻热噪声
 
 玻尔兹曼常数：
 
@@ -293,17 +299,36 @@ k_B = 1.380649 × 10⁻²³ J/K
 ```
 
 ```text
+i_th,rms = √(4k_B T B / R_L)
+i_th² = 4k_B T B / R_L
+i_th,density = √(4k_B T / R_L)         [A/√Hz]
+v_th,rms = √(4k_B T R_L B)
+v_th,density = √(4k_B T R_L)           [V/√Hz]
+
+i_n,rms = √[
+  2qM²F(M)(I_p + I_d)B +
+  4k_B T B / R_L
+]
+```
+
+`R_L` 是 APD 独立负载电阻。这些指标始终计算并展示，但只有开启“计入负载热噪声”后才并入系统总 RMS 噪声。
+
+### 14. TIA 反馈电阻热噪声
+
+```text
 i_Rf,density = √(4k_B T / R_f)
 i_Rf,rms = i_Rf,density √B
 ```
 
-### 14. 运放输入电流噪声
+`R_f` 是跨阻放大器反馈电阻，与 `R_L` 分开建模。典型 TIA 结构保留 `R_f` 热噪声并关闭 `R_L` 并入开关，防止同一电阻热噪声重复计算。
+
+### 15. 运放输入电流噪声
 
 ```text
 i_op,rms = i_op,density √B
 ```
 
-### 15. 运放输入电压噪声
+### 16. 运放输入电压噪声
 
 简化模式：
 
@@ -321,7 +346,7 @@ i_voltage,rms = √∫ i_n²(f) df
 
 积分上限根据 ENBW 自动扩展到 `20 × ENBW`，不是只在单一频点估算。
 
-### 16. ADC 量化噪声
+### 17. ADC 量化噪声
 
 ```text
 V_LSB = V_fullscale / 2^N
@@ -329,17 +354,19 @@ V_q,rms = V_LSB / √12
 i_ADC,rms = V_q,rms / R_f
 ```
 
-### 17. 总 RMS 噪声
+### 18. 总 RMS 噪声
 
 ```text
 i_total = √(
   i_signal² + i_background² + i_bulk-dark² + i_surface-dark² +
-  i_Rf² + i_op-current² + i_op-voltage² + i_bias² +
+  [i_RL²] + i_Rf² + i_op-current² + i_op-voltage² + i_bias² +
   i_ADC² + i_other²
 )
 ```
 
-### 18. TIA、后级与饱和
+方括号中的 `i_RL²` 仅在用户开启 APD 负载热噪声并入开关时加入。
+
+### 19. TIA、后级与饱和
 
 ```text
 |V_TIA,sig| = I_sig R_f
@@ -352,7 +379,7 @@ V_peak = |V_TIA,DC| + |V_out,sig|
 
 后级理想线性增益会同时放大信号与已有噪声，不会提高输入 SNR；后级自身噪声只会保持或降低系统 SNR。
 
-### 19. 信噪比
+### 20. 信噪比
 
 连续光：
 
@@ -397,6 +424,7 @@ SNR_dB = 20 log10(SNR_mod)
 | 典型 / 最大暗电流 | 0.2 nA / 2 nA |
 | 体 / 表面暗电流 | 0.16 nA / 0.04 nA |
 | APD 结电容 | 6 pF |
+| APD 负载电阻 / 是否并入系统总噪声 | 10 MΩ / 否 |
 | ENBW | 300 Hz |
 | TIA 反馈电阻 | 10 MΩ |
 | 调制深度 | 100% |
@@ -427,25 +455,31 @@ SNR_dB = 20 log10(SNR_mod)
 
 ## 测试覆盖
 
-`src/tests/core.test.ts` 包含 17 个测试：
+`src/tests/core.test.ts` 包含 23 个测试：
 
 1. 光功率按距离平方反比变化。
 2. 光功率与辐射强度成正比。
 3. 光功率与透镜面积成正比。
-4. APD 初级光电流等于响应度乘以光功率。
-5. APD 输出电流正确乘以增益。
-6. 指数和 McIntyre 过剩噪声因子正确。
-7. 噪声随带宽平方根变化。
-8. 调制 SNR 随调制深度变化。
-9. 典型暗电流与最大暗电流结果不同。
-10. 300 Hz ENBW 直接使用 300 Hz。
-11. 显示单位切换不改变 SI 数值。
-12. 非法 JSON 不会导致应用崩溃。
-13. 默认笛卡尔积生成完整 9 组结果。
-14. 多光源功率叠加正确。
-15. 背景光增大时散粒噪声增大。
-16. 后级理想增益不提高输入 SNR。
-17. TIA 饱和判断正确。
+4. 镜头入口功率包含全部传播损耗。
+5. 所有效率为 1 时链路不存在未知损耗。
+6. APD 初级光电流等于响应度乘以光功率。
+7. APD 输出电流正确乘以增益。
+8. 指数和 McIntyre 过剩噪声因子正确。
+9. 噪声随带宽平方根变化。
+10. 背景光增大时散粒噪声增大。
+11. 300 Hz ENBW 直接使用 300 Hz。
+12. 五项电阻热噪声公式正确。
+13. APD 散粒与热噪声合成公式正确。
+14. APD 负载热噪声开关只控制是否并入总噪声。
+15. 调制 SNR 随调制深度变化。
+16. 典型暗电流与最大暗电流结果不同。
+17. 显示单位切换不改变 SI 数值。
+18. 非法 JSON 不会导致应用崩溃。
+19. 旧版 JSON 自动补全新增热噪声字段。
+20. 默认笛卡尔积生成完整 9 组结果。
+21. 多光源功率叠加正确。
+22. 后级理想增益不提高输入 SNR。
+23. TIA 饱和判断正确。
 
 ## 项目结构
 
