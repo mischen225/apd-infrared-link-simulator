@@ -1,11 +1,17 @@
 {
   "name": "apd-infrared-link-simulator",
+  "description": "APD红外光链路、噪声、扫描与矩阵综合仿真平台",
+  "author": "mischen225",
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "main": "desktop/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && node scripts/clean-dist.mjs && vite build && node scripts/prepare-sites.mjs",
+    "desktop:bundle": "tsc -b && vite build --config vite.desktop.config.ts",
+    "desktop:pack": "pnpm desktop:bundle && electron-builder --win --x64 --dir",
+    "desktop:build": "pnpm desktop:bundle && electron-builder --win portable nsis --x64",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -25,10 +31,53 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
     "jsdom": "^25.0.1",
     "typescript": "~5.6.3",
     "vite": "^6.0.5",
     "vitest": "^2.1.8",
     "wrangler": "^4.114.0"
+  },
+  "build": {
+    "appId": "com.mischen225.apd-infrared-link-simulator",
+    "productName": "APD红外光链路综合仿真平台",
+    "copyright": "Copyright © 2026 mischen225",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop/**/*",
+      "dist-desktop/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "APD-Infrared-Link-Simulator-${version}-${arch}-Portable.${ext}"
+    },
+    "nsis": {
+      "artifactName": "APD-Infrared-Link-Simulator-${version}-${arch}-Setup.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "APD红外光链路综合仿真平台"
+    }
   }
 }

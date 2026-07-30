@@ -39,6 +39,30 @@ pnpm test
 pnpm build
 ```
 
+## Windows 离线桌面版
+
+桌面版使用 Electron 封装，运行时、页面资源和仿真内核全部包含在 EXE 中。目标电脑无需联网，也无需安装 Node.js、浏览器或其他依赖。
+
+首次打包需要联网下载 Electron 与 Windows 打包工具：
+
+```bash
+pnpm install
+pnpm desktop:build
+```
+
+生成文件位于 `release/`：
+
+- `APD-Infrared-Link-Simulator-1.0.0-x64-Portable.exe`：便携版，复制到任意 Windows x64 电脑后双击运行。
+- `APD-Infrared-Link-Simulator-1.0.0-x64-Setup.exe`：安装版，可选择安装目录并创建桌面与开始菜单快捷方式。
+
+仅生成解包测试目录：
+
+```bash
+pnpm desktop:pack
+```
+
+桌面版与网页版使用同一套 React/TypeScript 仿真内核。配置、场景和计算均保存在本机；除非用户主动打开外部链接，否则程序不会访问网络。
+
 ## 离线运行
 
 - 所有光学、APD、噪声、扫描、矩阵和蒙特卡洛计算都在浏览器中完成。
